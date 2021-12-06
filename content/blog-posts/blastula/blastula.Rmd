@@ -2,7 +2,7 @@
 title: "Sending Automated and Customized Emails in R using `blastula`"
 author: "Muhammet Özkaraca"
 date: 2021-12-05T21:13:14-05:00
-categories: ["R"]
+draft: false
 ---
 
 ```{r setup, include=FALSE}
