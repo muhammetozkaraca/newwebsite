@@ -3,5 +3,5 @@ header:
   caption: ""
   image: ""
 title: GazeteBilkent Columns
-view: 2
+view: 4
 ---
