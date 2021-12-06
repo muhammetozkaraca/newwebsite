@@ -1,0 +1,96 @@
+---
+title: "Sending Automated and Customized Emails in R using `blastula`"
+author: "Muhammet Özkaraca"
+date: 2021-12-05T21:13:14-05:00
+categories: ["R"]
+---
+
+<script src="{{< blogdown/postref >}}index.en_files/header-attrs/header-attrs.js"></script>
+
+
+<div id="introduction" class="section level1">
+<h1>Introduction</h1>
+<p>Whether you’re a university lecturer, an intern, or an office worker, you may need to send the same email to a large group of people from time to time. Although these emails do not need to be sophisticated, such as those describing assignment requirements; depending on one’s job responsibilities, one may need to polish specific email templates, such as newsletters. If you’re encountering similar issues, R has something to offer you for free.</p>
+</div>
+<div id="becoming-acquainted-with-blastula" class="section level1">
+<h1>Becoming acquainted with <code>blastula</code></h1>
+<p>In R, there are various tools that can assist in sending automated emails, and <code>blastula</code> is one of them. This package basically allows you to send automated emails to several people; however, I’m not sure if there is a limit. Apart from being free, this also allows you to customize email templates in a markdown environment by using both markdown and html syntax.</p>
+<p>Let’s start by installing <code>blastula</code>. Please note that I also installed the <code>keyring</code> package, as when I first installed <code>blastula</code> alone, I received an error advising me to do so. Therefore, in case you might encounter something similar, I suggest you install both packages.</p>
+<pre class="r"><code>library(blastula)
+library(keyring)</code></pre>
+<p>For advanced R users who need further information on the different features of <code>blastula</code>, <a href="https://cran.r-project.org/web/packages/blastula/blastula.pdf">this document</a> can be useful. I will not go over all of these details in this post simply because this tutorial is geared for everyone, including beginner users. Instead, I’ll go through the fundamentals. If you want, feel free to look at this document.</p>
+<p>Please open a new R markdown document now. I recommend deleting all of the YAML and simply keeping the following code chunk in your YAML. Don’t be concerned if you don’t know what YAML is. The basic thing I know about YAML’s functionality, and I believe it is more than enough at this time, is that it informs R about the output you wish to obtain after your coding. <code>output: blastula::blastula email</code> tells R that you want to utilize the <code>blastula</code> package to create an email from it, which is exactly what we want.</p>
+<p>Please also note that you do not have to open a new R markdown document to customize your email template. <code>blastula</code> offers some specific functions, such as <code>compose_email</code> that can help you compose your email. However, I feel it is more user friendly to do this same functionality in a different Rmarkdown document. In case you wish to look at <code>compose_email</code> argument, <a href="https://cran.r-project.org/web/packages/blastula/blastula.pdf">the same document</a> I mentioned above might be convenient for you.</p>
+<pre class="r"><code>---
+output: blastula::blastula_email 
+---</code></pre>
+<p>So until you should have 2 open tabs in your R Studio environment. In one of them you have a R Script which you installed <code>blastula</code> and in another tab, you have a R markdown document where you tell R, you want to compose a <code>blastula</code> email. Pay attention to locate these two documents in the same directory. Our mission right now is to customize an email content in Rmarkdown and send it to our recipients successfully.</p>
+</div>
+<div id="customizing-an-email" class="section level1">
+<h1>Customizing an email</h1>
+<p>Now, let’s go back to R markdown and customize a simple email template to send it to our recipients. To do this, you might use markdown guidelines but I will use mostly html coding although I will take advantage of some R markdown syntax.</p>
+<pre class="r"><code>&lt;center&gt;
+
+&lt;h1 style = &quot;color: #478dff; font-family: Copperplate&quot;&gt; Your Title &lt;/h1&gt;
+
+&lt;small&gt;Prepared by [Your Name](Your Website Link &quot;Your Name&quot;).&lt;/small&gt;
+
+&lt;/center&gt;</code></pre>
+<p>In this code, <code>&lt;center&gt;</code> helps the title of our document become centered. You can think of <code>&lt;h1</code> as “Heading 1”. The <code>style</code> argument designates what type of title we want. We want the title to be in the <code>Copperplate</code> font family and in the color <code>#478dff</code>.You can change these font families and colors as you wish. To see your options, <a href="https://www.w3schools.com/css/css_font.asp">this link</a> can give you a sense. Based on my mistakes, let me warn you that if you want to use font types whose names have more than one word, such as “Times New Roman”, you need to revise the font family as <code>font-family: 'Times New Roman'</code> due to syntax issues.</p>
+<p>After writing your name, you can also add your name and website to the email. In the second line of the code, <code>&lt;small&gt;</code> helps to change the size of the font.</p>
+<p>Now, assume that you want to embed a picture into your email, and when the users click on the picture, you want it to open in a different tab. The following code will take care of all these issues.</p>
+<pre class="r"><code>***
+&lt;center&gt;
+
+&lt;a href=&quot;The link you want to be demonstrated when the user click on the picture&quot; target=&quot;_blank&quot;&gt;&lt;img src=&quot;The name of the picture you want to embed in your email.png&quot; alt=&quot;HTML tutorial&quot; style=&quot;width:600px;height:400px;&quot;&gt;&lt;/a&gt;
+
+&lt;/center&gt;
+
+&lt;center&gt;
+&lt;h2 style=&quot;font-size:20px; font-family:&#39;Courier New&#39;&quot;&gt;
+&lt;a href=&quot;The link you want to be demonstrated when the user click on the title&quot;&gt; &quot;The title&quot; &lt;/a&gt; &lt;/h2&gt;
+&lt;/center&gt;
+
+***</code></pre>
+<p>Recall that we want to embed a picture in our document, and when we click on it, we want a new tab to be opened. To do this, <code>&lt;href&gt;</code> argument includes the link we want to put in the email. Furthermore, <code>target="_blank"</code> function tells the R markdown to open a new blank tab where your designated link in <code>&lt;href&gt;</code> will be shown. In <code>src=</code> argument, we define which image we want to use. Also, pay attention to putting this image in the same directory as your R Script and R Markdown. Finally, <code>alt</code> argument helps to name and <code>style</code> argument helps to define the embedded picture’s size.</p>
+<p>While in the first code, we embed a picture and use it as a link, the second code does the same job for titles. More specifically, now the user can click on the title and the link you want to be demonstrated in the email can be opened. Note that I did not use <code>target="_blank"</code> function this time, and therefore the webpage is not opened in another tab. Lastly, similar to the previous ones, with <code>style</code> argument, I tailor the font size and font type of the title.</p>
+<p>You may also wonder why I put <code>***</code> at the beginning and at the end. This can help to put blocks in your email. By this way, you can better demonstrate the different contents in your email.</p>
+<pre class="r"><code>&lt;row&gt;
+  
+&lt;h4 style=&quot;font-family:&#39;Times New Roman&#39;&quot;&gt;
+  
+
+The body of the email.
+
+
+&lt;/h4&gt;
+
+
+&lt;/row&gt;</code></pre>
+<p>Lastly, you can add normal text below your title with this code.</p>
+<p>Until now, we customized the email that we wanted to send to our recipients. To see how each step changes the final output, you can save the rmarkdown document and knit it.</p>
+<p>Now is the time to use the <code>blastula</code> package. Save this Rmarkdown document and in the R script where you installed <code>blastula</code> and <code>keyring</code> packages, run the following code.</p>
+</div>
+<div id="sending-emails" class="section level1">
+<h1>Sending emails</h1>
+<pre class="r"><code>email &lt;- render_email(&#39;Name of Your R makrdown document.Rmd&#39;)</code></pre>
+<p>What this code line is doing is turning the R markdown document into an object that <code>blastula</code> can understand and send it as email. Following this, we will need to compose an SMTP key using this code.</p>
+<pre class="r"><code>create_smtp_creds_key(
+  id = &quot;gmail&quot;,
+  user = &quot;The gmail adress you want to send your email from&quot;,
+  provider = &quot;gmail&quot;,
+  overwrite = TRUE
+)</code></pre>
+<p>Although you don’t need to know much about SMTP, and neither do I, you may consider of it as a key that tells Gmail who you are. When you run this code for the first time, a new tab will open and R will prompt you for your Gmail password. It’s also likely that you’ll get a warning from Gmail about a critical security alert, because Gmail won’t be able to tell if you’re doing this on your own or if someone else is using your account.</p>
+<p>Please keep in mind that <code>blastula</code> is currently only working with a few email providers, one of which being Gmail. This means that regardless of whose service your recipients use, such as icloud, you can only send such automatically generated emails from a certain provider like Gmail. You can learn more about this by visiting <a href="https://github.com/rstudio/blastula">the package’s Github page</a>.</p>
+<p>Finally, you’ll need to run this code in order to send your email.</p>
+<pre class="r"><code>email %&gt;%
+  smtp_send(
+    to = &quot;your recipient&quot;,
+    from = &quot;your email address&quot;,
+    subject = &quot;the subject of the email&quot;,
+    credentials = creds_key(&quot;gmail&quot;)
+  )</code></pre>
+<p>In case, you might want to send more than one recipient, you can write this in <code>to = c("recipient1-email","recipient2-email",recipient3-email")</code>.</p>
+<p>I hope you found this article on how to send automatic and personalised emails in R useful. You can look at <a href="http://cakedown.alexandredeschamps.ca">this page</a> for further information on how to customize email templates, which I found quite useful while preparing this guide. If you have any additional queries, please contact me at <a href="mailto:muhammetozk@icloud.com">muhammetozk@icloud.com</a>.</p>
+</div>
