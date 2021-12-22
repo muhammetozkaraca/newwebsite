@@ -1,0 +1,226 @@
+---
+title: "Mapping the Number of Foreign Currency Deposit Accounts across Turkish Cities"
+subtitle: "A Comparison of 2010 and 2020"
+summary: In this post, I visualize the number of foreign currency deposit accounts across Turkish cities between 2010 and 2020. 
+date: 2021-12-20T21:13:14-05:00
+output:
+  rmdformats::robobook:
+    highlight: kate
+---
+
+<script src="Mapping-Number-of-Foreign-Currency-Accounts-across-Turkish-Cities kopyası_files/header-attrs/header-attrs.js"></script>
+
+
+<p>In recent years, the Turkish lira has depreciated significantly against foreign currencies. To hedge against this depreciation, in addition to the increasing inflation, several Turkish people have converted their funds to other currencies, mainly the US dollar and the Euro. This process leads them to open bank accounts in foreign currencies. In this post, I will attempt to visualize this process by mapping the number of foreign currency accounts by city. My analysis will involve a comparison of 2010 and 2020. To this end, I will utilize “Number of Foreign Currency Deposit Accounts” data from the <a href="https://verisistemi.tbb.org.tr/index.php?/tbb/report_bolgeler">Banks Association of Turkey</a>. The geospatial data I will use in this post will come from the <a href="https://gadm.org/download_country.html">GADM</a>. Please note that the GADM data cannot be used for commercial purposes.</p>
+<p>In the first stage, I will download data from both sources. After tidying up the <code>Number of Foreign Currency Deposit Accounts</code> data, I will merge it with the geospatial data. Finally, I will try to make some maps to demonstrate the change in foreign currency deposit accounts by city.</p>
+<div id="introductory-steps" class="section level1">
+<h1>Introductory Steps</h1>
+<p>As a first step, I will download data from <a href="https://verisistemi.tbb.org.tr/index.php?/tbb/report_bolgeler">the Banks Association of Turkey</a>. When you click on the previous highlighted link, you will see that there are 3 main columns, namely:
+<code>Geographical Regions and Provinces</code>, <code>Periods</code>, <code>Parameters</code>. For the sake of reproducibility, I will ask you to choose <code>Select All</code> in the <code>Geographical Regions and Provinces</code> part and then exclude all rows until Istanbul. In the <code>Periods</code>, we can select all rather than only 2010 and 2020 since we will do a data cleaning session before starting to map visualizations. Finally, in the <code>Parameters</code> part, I kindly ask you to select <code>Number of Foreign Currency Deposit Accounts</code> since this is the data we will use in this post. After that, you can click on <code>Report</code> and, by clicking on the Excel icon on the new page, you can download the data onto your computer automatically.</p>
+<p>In a similar manner, let’s move on <a href="https://gadm.org/download_country.html">the GADM website</a> and please select <code>Turkey</code> from the country list, as well as download <code>R (sp) - level 1</code> data. Now, the trickiest part about this process is that;</p>
+<ul>
+<li><code>Level 0</code>: gives the boundaries of a country</li>
+<li><code>Level 1</code>: gives the boundaries of the cities in a given country</li>
+<li><code>Level 2</code>: gives the boundaries of the cities’ counties in a given country</li>
+</ul>
+<p>As we want to visualize the data by city, we need to choose <code>Level 1</code>. Also, please note that <code>sp</code> refers to <code>spatial polygons</code>, while you can think of <code>sf</code> as <code>spatial features</code>. The main difference between these two that will matter significantly for our purpose is that, <code>sp</code> has points data for each city that will allow R to map cities’ boundaries when we run our code. Therefore, you can think of it as first making polygons and then turning them into a map. However, <code>sf</code> has a different coding structure for spatial analyses. For further information, you can look at <a href="https://cran.r-project.org/web/packages/sf/sf.pdf">its documentation</a></p>
+<p>Now, let’s load the required packages and the data into our working space and start exploring the data.</p>
+</div>
+<div id="installing-libraries-and-the-data-into-r" class="section level1">
+<h1>Installing Libraries and the data into R</h1>
+<pre class="r"><code>options(scipen=999) # to prevent scientific notation (I will explain it in detail later)
+library(readxl) # to read excel files
+library(dplyr)  # for data analysis purposes
+library(tidyverse) # for data analysis purposes
+library(ggplot2) # to make visualisations
+library(viridis) # to make visualisations
+library(sp)      # to read geospatial data</code></pre>
+<p>Now, let’s install data in R and look at the head of <code>Number of Foreign Currency Deposit Accounts</code> data.</p>
+<pre class="r"><code>setwd(&quot;~/Desktop&quot;) # Be careful about where your R working directory is and where your downloaded data is located. If your data is not in the same place where your R working directory is, then R cannot read the data.
+foreign_currency_accounts &lt;- read_excel(&quot;~/Desktop/PivotGrid-2.xlsx&quot;)
+tur_spatial &lt;- readRDS(&quot;~/Desktop/gadm36_TUR_1_sp.rds&quot;)
+
+head(foreign_currency_accounts)</code></pre>
+<pre><code>## # A tibble: 6 × 13
+##   ...1     ...2   `2010` `2011` `2012` `2013` `2014` `2015` `2016` `2017` `2018`
+##   &lt;chr&gt;    &lt;chr&gt;   &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;
+## 1 Number … İstan… 3.66e6 4.02e6 3.91e6 3.95e6 4.07e6 4.35e6 5.14e6 5.37e6 6.31e6
+## 2 &lt;NA&gt;     Adana  2.49e5 2.88e5 2.65e5 2.65e5 2.67e5 2.79e5 3.18e5 3.25e5 3.78e5
+## 3 &lt;NA&gt;     Adıya… 3.45e4 3.68e4 3.03e4 3.02e4 3.13e4 3.48e4 3.93e4 4.36e4 5.49e4
+## 4 &lt;NA&gt;     Afyon… 9.10e4 1.03e5 9.85e4 9.68e4 9.92e4 1.04e5 1.11e5 1.22e5 1.42e5
+## 5 &lt;NA&gt;     Ağrı   2.17e4 2.32e4 1.77e4 1.80e4 1.83e4 2.17e4 2.32e4 2.58e4 3.27e4
+## 6 &lt;NA&gt;     Aksar… 8.37e4 8.91e4 8.15e4 8.25e4 8.44e4 9.20e4 9.27e4 1.02e5 1.17e5
+## # … with 2 more variables: 2019 &lt;dbl&gt;, 2020 &lt;dbl&gt;</code></pre>
+<pre class="r"><code>colnames(foreign_currency_accounts)</code></pre>
+<pre><code>##  [1] &quot;...1&quot; &quot;...2&quot; &quot;2010&quot; &quot;2011&quot; &quot;2012&quot; &quot;2013&quot; &quot;2014&quot; &quot;2015&quot; &quot;2016&quot; &quot;2017&quot;
+## [11] &quot;2018&quot; &quot;2019&quot; &quot;2020&quot;</code></pre>
+<p>We have cities’ names stored in the second column, and the different years’ values for each city are stored in different columns. Actually, this is not what we want, particularly when doing such an analysis. If years were stored under a <code>year</code> column, and the values would be stored in another column, this would make our analysis much easier indeed. Therefore, we will need to do some basic data wrangling here. Let’s start by changing the name of the column where cities’ names are stored.</p>
+<pre class="r"><code>colnames(foreign_currency_accounts)[2] &lt;- &quot;cities&quot;</code></pre>
+<pre class="r"><code>foreign_currency_accounts_2010_2020 &lt;-  foreign_currency_accounts %&gt;%
+  dplyr::select(&quot;cities&quot;, &quot;2010&quot;,&quot;2020&quot;) %&gt;%
+  pivot_longer(!&quot;cities&quot;, names_to = &quot;years&quot;, values_to = &quot;account_numbers&quot;)
+
+head(foreign_currency_accounts_2010_2020)</code></pre>
+<pre><code>## # A tibble: 6 × 3
+##   cities   years account_numbers
+##   &lt;chr&gt;    &lt;chr&gt;           &lt;dbl&gt;
+## 1 İstanbul 2010          3664251
+## 2 İstanbul 2020          9218687
+## 3 Adana    2010           249008
+## 4 Adana    2020           582865
+## 5 Adıyaman 2010            34532
+## 6 Adıyaman 2020            85340</code></pre>
+<p>This is far better than the first one. Let us revise what we have done so far. We first renamed the second column in our data set to <code>cities</code> since it would not lead to further misunderstandings. Then, by using <code>select</code> function from the <code>dplyr</code> package, we selected 3 crucial columns for our analysis from the main dataset. They are, namely, <code>cities</code>, <code>2010</code>, and <code>2020</code>. Following that, as we wanted the years to be stored in a new column named <code>years</code>, and the values corresponding to them in a new column named <code>account_numbers</code>, we used the powerful <code>pivot_longer</code> function from the <code>dplyr</code> package.</p>
+<p><code>!"cities"</code> told R not to touch this column. <code>names_to</code> told R to store <code>2010</code>, and <code>2020</code> in a new column named <code>years</code> and the corresponding values went to the new <code>account_numbers</code> column by using <code>values_to</code> argument. Before moving on, if you want to have a further look at <code>pivot_longer</code> function, you can try <a href="https://tidyr.tidyverse.org/reference/pivot_longer.html">this website</a>.</p>
+<p>Now, let’s focus on the <code>tur_spatial</code> data. When you run <code>view(tur_spatial)</code> code, you can see that the data has different objects such as <code>polygons</code>, <code>data</code>, and <code>plotOrder</code>. Without getting into the specifics of these objects, let’s run the following code chunk and see what we’re aiming for;</p>
+<pre class="r"><code>tur_spatial_fort &lt;- fortify(tur_spatial)
+head(tur_spatial_fort)</code></pre>
+<pre><code>##       long      lat order  hole piece id group
+## 1 35.41454 36.58850     1 FALSE     1  1   1.1
+## 2 35.41459 36.58820     2 FALSE     1  1   1.1
+## 3 35.41434 36.58820     3 FALSE     1  1   1.1
+## 4 35.41347 36.58820     4 FALSE     1  1   1.1
+## 5 35.41347 36.58792     5 FALSE     1  1   1.1
+## 6 35.41236 36.58792     6 FALSE     1  1   1.1</code></pre>
+<pre class="r"><code>head(tur_spatial@data)</code></pre>
+<pre><code>##    GID_0 NAME_0   GID_1   NAME_1      VARNAME_1 NL_NAME_1 TYPE_1 ENGTYPE_1 CC_1
+## 1    TUR Turkey TUR.1_1    Adana         Seyhan      &lt;NA&gt;     Il  Province &lt;NA&gt;
+## 12   TUR Turkey TUR.2_1 Adiyaman       Adıyaman      &lt;NA&gt;     Il  Province &lt;NA&gt;
+## 23   TUR Turkey TUR.3_1    Afyon Afyonkarahisar      &lt;NA&gt;     Il  Province &lt;NA&gt;
+## 34   TUR Turkey TUR.4_1     Agri  Ağri|Karaköse      &lt;NA&gt;     Il  Province &lt;NA&gt;
+## 45   TUR Turkey TUR.5_1  Aksaray           &lt;NA&gt;      &lt;NA&gt;     Il  Province &lt;NA&gt;
+## 56   TUR Turkey TUR.6_1   Amasya           &lt;NA&gt;      &lt;NA&gt;     Il  Province &lt;NA&gt;
+##    HASC_1
+## 1   TR.AA
+## 12  TR.AD
+## 23  TR.AF
+## 34  TR.AG
+## 45  TR.AK
+## 56  TR.AM</code></pre>
+<p>With the <code>fortify</code> function, we aimed to convert the spatial data into a data frame. In addition to that, with <code>head(tur_new@data)</code>, we also try to access the data object in <code>tur_spatial</code> data.</p>
+<p>Now, as the second step, I will merge <code>foreign_currency_accounts_2010_2020</code> data with <code>tur_spatial</code> so that we can finally move to the last stage.</p>
+</div>
+<div id="merging-datasets" class="section level1">
+<h1>Merging Datasets</h1>
+<p>This step is another tricky part of our analysis as it requires a careful examination due to the punctuation differences in city names between <code>foreign_currency_accounts_2010_2020</code> and <code>tur_spatial</code>. While this problem occurs because of the nature of the Turkish language, and poses a serious obstacle in our analysis as we aim to merge these two datasets based on cities’ names, with a careful examination, we can handle this problem. Let us first lower all city names in the <code>foreign_currency_accounts_2010_2020</code> data and then initialize the first letters so that the differences can be minimalized. Following that, let us look at which city names are different between these two datasets with the following code chunk.</p>
+<pre class="r"><code>foreign_currency_accounts_2010_2020$cities &lt;-
+  tolower(foreign_currency_accounts_2010_2020$cities)
+
+foreign_currency_accounts_2010_2020$cities &lt;-
+  str_to_title(foreign_currency_accounts_2010_2020$cities)
+
+a &lt;- unique(tur_spatial@data$NAME_1)
+b &lt;- unique(foreign_currency_accounts_2010_2020$cities)
+setdiff(a,b)</code></pre>
+<pre><code>##  [1] &quot;Adiyaman&quot;   &quot;Afyon&quot;      &quot;Agri&quot;       &quot;Aydin&quot;      &quot;Balikesir&quot; 
+##  [6] &quot;Çankiri&quot;    &quot;Diyarbakir&quot; &quot;Eskisehir&quot;  &quot;Gümüshane&quot;  &quot;K. Maras&quot;  
+## [11] &quot;Kinkkale&quot;   &quot;Kirklareli&quot; &quot;Kirsehir&quot;   &quot;Mersin&quot;     &quot;Mugla&quot;     
+## [16] &quot;Mus&quot;        &quot;Nigde&quot;      &quot;Sanliurfa&quot;  &quot;Sirnak&quot;     &quot;Tekirdag&quot;  
+## [21] &quot;Usak&quot;       &quot;Zinguldak&quot;</code></pre>
+<p>As you can see from the output, 22 cities’ names in our <code>tur_spatial</code> data are different from <code>foreign_currency_accounts_2010_2020</code>. Worse than that, city names in <code>tur_spatial</code> data have some abbreviations and non-English characters that make it hard for us to handle these differences with a function. Therefore, first, I will do the easy part by converting non-English characters to English characters with a function that I learned from a <a href="https://stackoverflow.com/questions/17517319/r-replacing-foreign-characters-in-a-string">Stack Overflow post</a>. Then, as the abbreviations will require me to do the rest one by one, I will use a different code.</p>
+<pre class="r"><code>to.plain &lt;- function(s) {
+   old1 &lt;- &quot;şŞığ&quot;
+   new1 &lt;- &quot;sSig&quot;
+   s1 &lt;- chartr(old1, new1, s)
+} 
+
+s &lt;- foreign_currency_accounts_2010_2020$cities
+s1 &lt;- to.plain(s)
+
+s2 &lt;- tur_spatial@data$NAME_1
+s3 &lt;- to.plain(s2)
+
+foreign_currency_accounts_2010_2020$cities &lt;- s1
+tur_spatial@data$NAME_1 &lt;- s3
+
+a &lt;- unique(tur_spatial@data$NAME_1)
+b &lt;- unique(foreign_currency_accounts_2010_2020$cities)
+
+setdiff(a,b)</code></pre>
+<pre><code>## [1] &quot;Afyon&quot;     &quot;K. Maras&quot;  &quot;Kinkkale&quot;  &quot;Mersin&quot;    &quot;Zinguldak&quot;</code></pre>
+<p>To give a quick review of what we did in this step, I wrote a function named <code>to.plain</code>, that converts non-English letters in the Turkish language, such as <code>şŞığ</code> to English characters such as <code>sSig</code>. Nonetheless, there are still differences between the city names due to mainly abbreviation issues, along with cases where a city has two names and the two datasets have coded it differently. Thus, I will handle the rest by hand.</p>
+<pre class="r"><code>foreign_currency_accounts_2010_2020$cities[
+  which(foreign_currency_accounts_2010_2020$cities == &quot;Afyonkarahisar&quot;)] &lt;- &quot;Afyon&quot;
+foreign_currency_accounts_2010_2020$cities[
+  which(foreign_currency_accounts_2010_2020$cities == &quot;Kahramanmaras&quot;)] &lt;- &quot;K. Maras&quot;
+foreign_currency_accounts_2010_2020$cities[
+  which(foreign_currency_accounts_2010_2020$cities == &quot;Kirikkale&quot;)] &lt;- &quot;Kinkkale&quot;
+foreign_currency_accounts_2010_2020$cities[
+  which(foreign_currency_accounts_2010_2020$cities == &quot;Içel&quot;)] &lt;- &quot;Mersin&quot;
+foreign_currency_accounts_2010_2020$cities[
+  which(foreign_currency_accounts_2010_2020$cities == &quot;Zonguldak&quot;)] &lt;- &quot;Zinguldak&quot;
+
+a &lt;- unique(tur_spatial@data$NAME_1)
+b &lt;- unique(foreign_currency_accounts_2010_2020$cities)
+
+setdiff(a,b)</code></pre>
+<pre><code>## character(0)</code></pre>
+<p>Now, as all the city names’ across the two datasets are matched, we can merge them together with the following code chunk.</p>
+<pre class="r"><code>colnames(foreign_currency_accounts_2010_2020)[1] &lt;- &quot;NAME_1&quot;
+
+merged_raw &lt;- data_frame(id = rownames(tur_spatial@data),
+                                NAME_1 = tur_spatial@data$NAME_1) %&gt;% 
+  left_join(foreign_currency_accounts_2010_2020, by = &quot;NAME_1&quot;)
+merged_raw %&gt;% head()</code></pre>
+<pre><code>## # A tibble: 6 × 4
+##   id    NAME_1   years account_numbers
+##   &lt;chr&gt; &lt;chr&gt;    &lt;chr&gt;           &lt;dbl&gt;
+## 1 1     Adana    2010           249008
+## 2 1     Adana    2020           582865
+## 3 12    Adiyaman 2010            34532
+## 4 12    Adiyaman 2020            85340
+## 5 23    Afyon    2010            91039
+## 6 23    Afyon    2020           203901</code></pre>
+<pre class="r"><code>merged&lt;- left_join(tur_spatial_fort, merged_raw, by = &quot;id&quot;)
+merged %&gt;% head()</code></pre>
+<pre><code>##       long     lat order  hole piece id group NAME_1 years account_numbers
+## 1 35.41454 36.5885     1 FALSE     1  1   1.1  Adana  2010          249008
+## 2 35.41454 36.5885     1 FALSE     1  1   1.1  Adana  2020          582865
+## 3 35.41459 36.5882     2 FALSE     1  1   1.1  Adana  2010          249008
+## 4 35.41459 36.5882     2 FALSE     1  1   1.1  Adana  2020          582865
+## 5 35.41434 36.5882     3 FALSE     1  1   1.1  Adana  2010          249008
+## 6 35.41434 36.5882     3 FALSE     1  1   1.1  Adana  2020          582865</code></pre>
+<p>To review what we have done in the last two steps, let’s go one by one. We initially changed the first column’s name of the <code>foreign_currency_accounts_2010_2020</code> data to <code>NAME_1</code> so that we could merge it with the <code>tur_spatial</code> based on <code>NAME_1</code> column.</p>
+<p>However, merging is not enough for our purposes. If you pay closer attention to our <code>merged</code> data, you can see that, there are different columns named as <code>id</code> or <code>group</code>. What this means is that, if you think of the <code>long</code> and <code>lat</code> as the points in a simple XY-plane, they help R identify which <code>long</code> and <code>lat</code> correspond to each other and therefore make up a particular city’s borders. Therefore, <code>id</code> column is very crucial for us, and we should match this information with each particular corresponding city. In the output of <code>merged_raw</code>, this is basically what we have done. We took each particular city’s corresponding <code>id</code> number, and by using <code>left_join</code> function, we matched them to the cities that are coded in the <code>foreign_currency_accounts_2010_2020</code> data based on <code>NAME_1</code>. Following that, we finally merged <code>merged_raw</code> and <code>tur_spatial_fort</code> by using the <code>id</code> column, which gave us <code>merged</code> data that we will finally use in visualisation.</p>
+<p>Although I tried to explain the steps as simply as possible, if these explanations might not be convenient for you, I would recommend you look at <a href="https://statisticsglobe.com/r-dplyr-join-inner-left-right-full-semi-anti">this website to understand how to use <code>left_join</code> function</a>. Now, as a last step in this section, I will add a <code>periods</code> column to our data set so that we can be able to produce a facetted graph.</p>
+<pre class="r"><code>merged$periods &lt;- merged$years
+merged$periods &lt;- as.factor(merged$periods)</code></pre>
+</div>
+<div id="visualize-the-data" class="section level1">
+<h1>Visualize the Data</h1>
+<p>Now, as the last step, we will visualize our data with the following code chunk;</p>
+<pre class="r"><code>quantile(merged$account_numbers, probs = seq(0, 1, 0.20), na.rm = FALSE)</code></pre>
+<pre><code>##      0%     20%     40%     60%     80%    100% 
+##    6187   97911  200608  412031  759047 9218687</code></pre>
+<pre class="r"><code>p &lt;- ggplot() +
+  geom_polygon(data = merged, aes(fill = account_numbers, x = long, y = lat, group = group) , size=0, alpha=0.9) +
+  theme_void() +
+  scale_fill_viridis(trans = &quot;log&quot;, breaks=c(6187,97911,200608,412031,759047,9218687), name=&quot;Total Account Number&quot;, guide = guide_legend( keyheight = unit(3, units = &quot;mm&quot;), keywidth=unit(12, units = &quot;mm&quot;), label.position = &quot;bottom&quot;, title.position = &#39;top&#39;, nrow=1) ) +
+  labs(
+    title = &quot;Number of Foreign Currency Deposit Accounts in Banks by Province in Turkey&quot;,
+    subtitle = &quot;2010 vs. 2020&quot;,
+    caption = &quot;Data: Banks Association of Turkey | Muhammet Ozkaraca&quot;
+  ) +
+  theme(
+    text = element_text(color = &quot;#22211d&quot;),
+    plot.background = element_rect(fill = &quot;#f5f5f2&quot;, color = NA),
+    panel.background = element_rect(fill = &quot;#f5f5f2&quot;, color = NA),
+    legend.background = element_rect(fill = &quot;#f5f5f2&quot;, color = NA),
+    plot.title = element_text(size= 15, hjust=0.01, color = &quot;#4e4d47&quot;, margin = margin(b = -0.1, t = 0.4, l = 2, unit = &quot;cm&quot;)),
+    plot.subtitle = element_text(size= 12, hjust=0.01, color = &quot;#4e4d47&quot;, margin = margin(b = -0.1, t = 0.43, l = 2, unit = &quot;cm&quot;)),
+    plot.caption = element_text(size=9, color = &quot;#4e4d47&quot;, margin = margin(b = 0.6, r=-1, unit = &quot;mm&quot;) ),
+    legend.position = c(0.22, -0.15)
+  ) +
+  coord_map() +
+  facet_wrap(~ periods, nrow = 1)
+
+p</code></pre>
+<p><img src="/blog-posts/Map/Mapping-Number-of-Foreign-Currency-Accounts-across-Turkish-Cities%20kopyas%C4%B1_files/figure-html/unnamed-chunk-13-1.png" width="672" /></p>
+<p>Voilà, here is our beautiful map that demonstrates a comparison of the number of foreign currency deposit accounts in Turkey between 2010 and 2020 by city-level. Before concluding our post, let us look at some specific arguments we made while making this output.</p>
+<ul>
+<li><p>Our data is <code>merged</code> that we want to plot. However, we want each city to be colored based on the number of foreign deposit accounts, so we write this <code>fill = account_numbers</code> code. Obviously, the X-axis should be <code>long</code> and the Y-axis should be <code>lat</code>. Furthermore, as I tried to explain above, we should tell R which <code>long</code> and <code>lat</code> coordinates should be grouped. <code>group = group</code> argument does this. We want <code>size = 0</code> because we do not have any business with this, and by <code>alpha=0.9</code>, we adjust the transparacy of colors in our map.</p></li>
+<li><p><code>theme_void</code> argument provides a blank background. By using <code>scale_fill_viridis</code>, we color our map. As the distribution of <code>account_numbers</code> data is not normal, you can view this view by mapping a box plot with <code>boxplot(merged$account_numbers)</code> code, we use <code>trans = "log"</code> argument to see the change between 2010 and 2020 better.</p></li>
+<li><p>Without going into further details, I want to lastly point out that <code>coord_map</code> and <code>facet_wrap</code> are other important functions that improve our plot. If you want to look further into the specifics of these arguments, <a href="https://www.r-graph-gallery.com">this website</a> has wonderful tutorials for making visualisations in R that I am sure will satisfy your needs.</p></li>
+</ul>
+<p>To conclude, in this tutorial, I tried to make a visualization that demonstrates the amount of change in foreign currency deposit accounts across cities in Turkey between 2010 and 2020. I hope this post can help you in your own endeavors. If you have further questions and suggestions, please do not hesitate to reach me via <a href="mailto:muhammetozk@icloud.com">muhammetozk@icloud.com</a>.</p>
+</div>
